@@ -1,0 +1,4 @@
+*.db
+*.info
+*.[Sp]o
+*.core

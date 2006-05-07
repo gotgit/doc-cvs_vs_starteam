@@ -1,0 +1,30 @@
+#
+# $FreeBSD: CVSROOT-src/access.doc_src,v 1.30 2003/07/21 21:13:20 simon Exp $
+#
+# This is for folks who are doc committers, but who work on docs in
+# the src/ tree as well.  To be clear, this file is in addition to
+# access.doc - names must not be here without also being in access.doc
+#
+# This file does not grant access to the src tree.  It only causes you
+# to get copies of the src commit messages and announcements.  All doc
+# committers implicitly have access to the src tree in order to commit
+# to man pages etc.
+#
+#	KEEP ALPHABETICALLY SORTED!!!
+#
+alex
+blackend
+brueffer
+ceri
+chern
+dannyboy
+gsutter
+hmp
+lioux
+mwlucas
+nik
+rushani
+seanc
+simon
+tom
+ue	devnull

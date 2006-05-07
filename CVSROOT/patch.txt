@@ -1,0 +1,816 @@
+Index: cfg.pm
+===================================================================
+RCS file: /home/repos-user/jiangxin/homepage/worldhello/docbook/cvs_vs_starteam/CVSROOT/cfg.pm,v
+retrieving revision 1.1
+retrieving revision 1.2
+diff -u -r1.1 -r1.2
+--- cfg.pm	14 Aug 2003 10:00:53 -0000	1.1
++++ cfg.pm	15 Aug 2003 01:44:20 -0000	1.2
+@@ -17,9 +17,10 @@
+ 	$ADD_TO_LINE $AVAIL_FILE $CHECK_HEADERS $COMMITCHECK_EXTRA
+ 	@COMMIT_HOSTS $COMMITTER $DEBUG $DIFF_BLOCK_TOTAL_LINES $EXCLUDE_FILE
+ 	$FILE_PREFIX $IDHEADER $LAST_FILE @LOG_FILE_MAP $MAILADDRS $MAILBANNER
+-	$MAILCMD $MAIL_BRANCH_HDR $MAIL_ON_DIR_CREATION $MAIL_TRANSFORM
++	$MAILCMD $MAIL_BRANCH_HDR @MAIL_MAP $MAIL_ON_DIR_CREATION $MAIL_TRANSFORM
+ 	$MINCVSVERSION $MAX_DIFF_SIZE $NO_DOS_LINEBREAKS $PID $PROG_CVS
+ 	$PROG_MV %TEMPLATE_HEADERS $TMPDIR $UNEXPAND_RCSID $WARN_HEADERS
++	$BADSENDER_FILE
+ );
+ 
+ my $CVSROOT = $ENV{'CVSROOT'} || die "Can't determine \$CVSROOT!";
+@@ -52,7 +53,7 @@
+ $PROG_MV =	'/bin/mv';		# mv(1)
+ 
+ # The username of the committer.
+-$COMMITTER = $ENV{"LOGNAME"} || $ENV{'USER'} || getlogin
++$COMMITTER = $ENV{"CVS_USER"} || $ENV{"LOGNAME"} || $ENV{'USER'} || getlogin
+ 		|| (getpwuid($<))[0] || sprintf("uid#%d",$<);
+ 
+ 
+@@ -83,6 +84,7 @@
+ # commit to what.
+ $AVAIL_FILE = "$CVSROOT/CVSROOT/avail";
+ 
++$BADSENDER_FILE = "$CVSROOT/CVSROOT/blocksender";
+ 
+ ################
+ ### logcheck ###
+@@ -208,6 +210,10 @@
+ 	'other'		=> '.*'
+ );
+ 
++@MAIL_MAP = (
++	'nobody'	=> '.*'
++);
++
+ # Include diffs of not greater than this size in kbytes in the
+ # commit mail for each file modified. (0 = off).
+ $MAX_DIFF_SIZE = 0;
+@@ -270,6 +276,64 @@
+ 	return @output;
+ };
+ 
++
++############################################################
++#
++# Subroutines
++#
++############################################################
++
++# !!! Mailing-list and commitlog history file mappings here !!!
++# This needs pulling out as a configuration block somewhere so
++# that others can easily change it.
++
++sub get_log_name {
++	my $dir = shift;	# Directory name
++
++
++	for my $i (0 .. ($#cfg::LOG_FILE_MAP - 1) / 2) {
++		my $log = $cfg::LOG_FILE_MAP[$i * 2];
++		my $pattern = $cfg::LOG_FILE_MAP[$i * 2 + 1];
++
++		return $log if $dir =~ /$pattern/;
++	}
++
++	return 'other';
++}
++
++sub get_mail_name {
++	my $dir = shift;	# Directory name
++	my $CVSROOT = $ENV{'CVSROOT'};
++	$dir =~ s,^$CVSROOT[/]?,,g;
++	$dir .= "/" unless $dir =~ /\/$/;
++	
++	for my $i (0 .. ($#cfg::MAIL_MAP - 1) / 2) {
++		my $email = $cfg::MAIL_MAP[$i * 2];
++		my $pattern = $cfg::MAIL_MAP[$i * 2 + 1];
++		return $email if $dir =~ /$pattern/;
++	}
++
++	return $cfg::MAILADDRS;
++}
++
++
++# do not send email, if committer is in badsender file...
++sub sendmail_acl_check {
++	my $sendmail = 1;
++	if (-e $cfg::BADSENDER_FILE)
++	{
++		open (BADSENDER, $cfg::BADSENDER_FILE) || die "open $cfg::BADSENDER_FILE: $!\n";
++		while (<BADSENDER>) {
++			if ($_ =~ /\b$cfg::COMMITTER\b/i)
++			{
++				$sendmail = 0;
++				last;
++			}
++		}
++	}
++	
++	return $sendmail;
++}
+ 
+ ######################################################################
+ # Load the local configuration file, that allows the entries in this
+Index: cfg_local.pm
+===================================================================
+RCS file: /home/repos-user/jiangxin/homepage/worldhello/docbook/cvs_vs_starteam/CVSROOT/cfg_local.pm,v
+retrieving revision 1.1
+retrieving revision 1.3
+diff -u -r1.1 -r1.3
+--- cfg_local.pm	14 Aug 2003 10:00:53 -0000	1.1
++++ cfg_local.pm	15 Aug 2003 03:09:39 -0000	1.3
+@@ -13,7 +13,7 @@
+ ####################################################################
+ ####################################################################
+ 
+-$CHECK_HEADERS = 1;
++$CHECK_HEADERS = 0;
+ $IDHEADER = 'FreeBSD';
+ $UNEXPAND_RCSID = 1;
+ 
+@@ -29,25 +29,30 @@
+ $MAILCMD = "/usr/local/bin/mailsend -H";
+ $MAIL_BRANCH_HDR  = "X-FreeBSD-CVS-Branch";
+ $ADD_TO_LINE = 0;
+-$MAILBANNER = "FreeBSD src repository";
++$MAILBANNER = "My repository";
+ if (defined $ENV{'CVS_COMMIT_ATTRIB'}) {
+   my $attrib = $ENV{'CVS_COMMIT_ATTRIB'};
+   $MAILBANNER .= " ($attrib committer)";
+ }
++# The minimum version of cvs that we will work with.
++$MINCVSVERSION = "1110200";  # 1.11.2
++
++$MAIL_ON_DIR_CREATION = 0;
+ 
+ # Sanity check to make sure we've been run through the wrapper and are
+ # now primary group 'ncvs'.
+ #
+-$COMMITCHECK_EXTRA = sub {
+-	my $GRP=`/usr/bin/id -gn`;
+-	chomp $GRP;
+-	unless ( $GRP =~ /^ncvs$/ ) {
+-		print "You do not have group ncvs (commitcheck)!\n";
+-		exit 1;	# We could return false here.  But there's
+-			# nothing to stop us taking action here instead.
+-	}
+-	return 1;
+-};
++
++#$COMMITCHECK_EXTRA = sub {
++#	my $GRP=`/usr/bin/id -gn`;
++#	chomp $GRP;
++#	unless ( $GRP =~ /^ncvs$/ ) {
++#		print "You do not have group ncvs (commitcheck)!\n";
++#		exit 1;	# We could return false here.  But there's
++#			# nothing to stop us taking action here instead.
++#	}
++#	return 1;
++#};
+ 
+ # Wrap this in a hostname check to prevent mail to the FreeBSD
+ # list if someone borrows this file and forgets to change it.
+@@ -91,6 +96,22 @@
+ 
+ 	'other'		=> '.*'
+ );
++# CVSROOT is still shared between src, ports, doc at the moment. projects has
++# its own CVSROOT.
++@MAIL_MAP = (
++	'maillist1' => '^CVSROOT/',
++	'maillist2' => '^src/',
++	'cvsnone' => '.*',
++); 
++
++@TAG_MAP = (
++	'jiangxin' => '^(release|mailstome).*',
++); 
++
++# Email addresses of recipients of commit mail.
++$MAILADDRS = 'cvsnone';
++
++
+ 
+ 1; # Perl requires all modules to return true.  Don't delete!!!!
+ #end
+Index: checkmailspool.sh
+===================================================================
+RCS file: /home/repos-user/jiangxin/homepage/worldhello/docbook/cvs_vs_starteam/CVSROOT/checkmailspool.sh,v
+retrieving revision 1.1
+retrieving revision 1.2
+diff -u -r1.1 -r1.2
+--- checkmailspool.sh	15 Aug 2003 02:59:23 -0000	1.1
++++ checkmailspool.sh	15 Aug 2003 03:00:48 -0000	1.2
+@@ -0,0 +1,35 @@
++#!/bin/sh
++# checkmailspool.sh
++# Auther: Jiang Xin
++#
++# $CVSMAILPATH (cvs mail spool) is a spool directory created by user, 
++# and cvs tag message will store in it.
++# run this script timely to check cvsmail spool and send messages...
++# please put this script in crontab. 
++
++
++CVSMAILPATH=/var/spool/cvsmail
++if [ ! -d $CVSMAILPATH ]; then
++	mkdir -p $CVSMAILPATH
++	chmod 777 $CVSMAILPATH
++fi
++
++cd $CVSMAILPATH
++for i in `ls `; do
++	pid=`echo $i| sed -e "s/.*\.\([0-9]*\)$/\1/"`
++	
++	xxx=0
++	
++	while ps -p $pid>/dev/null; do
++		xxx=`expr $xxx + 1`
++		if [ $xxx -gt 10 ]; then
++			break
++		fi
++		sleep 3
++		echo waiting $pid, $xxx times ...
++	done
++	echo -e "\n\n========================================" >> $i
++	echo -e "End\n" >> $i
++	cat $i | sendmail -oi -oem -odb -t
++	rm -f $i
++done
+Index: commitcheck
+===================================================================
+RCS file: /home/repos-user/jiangxin/homepage/worldhello/docbook/cvs_vs_starteam/CVSROOT/commitcheck,v
+retrieving revision 1.1
+retrieving revision 1.2
+diff -u -r1.1 -r1.2
+--- commitcheck	14 Aug 2003 10:00:53 -0000	1.1
++++ commitcheck	15 Aug 2003 02:42:27 -0000	1.2
+@@ -41,7 +41,9 @@
+ my $VERSTR = `$cfg::PROG_CVS -v`;
+ $VERSTR =~ s/.*Concurrent\D*(\S*).*/$1/s;
+ $VERSTR =~ s/\D+/./g;
++local $^W = 0;
+ my $VERSION = sprintf "%d%02d%02d%02d\n", split /\./, $VERSTR;
++local $^W = 1;
+ unless ($VERSION && $VERSION >= $cfg::MINCVSVERSION) {
+ 	print "The wrong version of CVS is installed (commitcheck)!\n";
+ 	exit 1;
+Index: config
+===================================================================
+RCS file: /home/repos-user/jiangxin/homepage/worldhello/docbook/cvs_vs_starteam/CVSROOT/config,v
+retrieving revision 1.1
+retrieving revision 1.2
+diff -u -r1.1 -r1.2
+--- config	14 Aug 2003 10:00:53 -0000	1.1
++++ config	15 Aug 2003 02:42:09 -0000	1.2
+@@ -15,3 +15,7 @@
+ # Set `LogHistory' to `all' or `TOFEWGCMAR' to log all transactions to the
+ # history file, or a subset as needed (ie `TMAR' logs all write operations)
+ #LogHistory=TOFEWGCMAR
++LogHistory=all
++
++# CVS 1.11.2 above feature : Reads the log message back in after this script has modified it. 
++RereadLogAfterVerify=always
+Index: cvswrappers
+===================================================================
+RCS file: /home/repos-user/jiangxin/homepage/worldhello/docbook/cvs_vs_starteam/CVSROOT/cvswrappers,v
+retrieving revision 1.1
+retrieving revision 1.2
+diff -u -r1.1 -r1.2
+--- cvswrappers	14 Aug 2003 10:00:53 -0000	1.1
++++ cvswrappers	15 Aug 2003 01:53:51 -0000	1.2
+@@ -28,3 +28,47 @@
+ #*.rtfd -f '$CVSROOT/CVSROOT/unwrap %s' -t '$CVSROOT/CVSROOT/wrap %s %s'
+ #*.draw -f '$CVSROOT/CVSROOT/unwrap %s' -t '$CVSROOT/CVSROOT/wrap %s %s'
+ #*.tiff -m 'COPY'
++*.gif -k 'b'
++*.GIF -k 'b'
++*.jpg -k 'b'
++*.JPG -k 'b'
++*.png -k 'b'
++*.PNG -k 'b'
++*.pdf -k 'b'
++*.PDF -k 'b'
++*.avi -k 'b'
++*.AVI -k 'b'
++*.mp3 -k 'b'
++*.MP3 -k 'b'
++*.mpg -k 'b'
++*.MPG -k 'b'
++*.doc -k 'b'
++*.DOC -k 'b'
++*.xls -k 'b'
++*.XLS -k 'b'
++*.xl* -k 'b'
++*.XL* -k 'b'
++*.mpp -k 'b'
++*.MPP -k 'b'
++*.ppt -k 'b'
++*.PPT -k 'b'
++*.dot -k 'b'
++*.DOT -k 'b'
++*.jar -k 'b'
++*.JAR -k 'b'
++*.tif -k 'b'
++*.TIF -k 'b'
++*.swf -k 'b'
++*.SWF -k 'b'
++*.bmp -k 'b'
++*.BMP -k 'b'
++*.exe -k 'b'
++*.EXE -k 'b'
++*.o   -k 'b'
++*.O   -k 'b'
++*.tgz -k 'b'
++*.TGZ -k 'b'
++*.gz  -k 'b'
++*.GZ  -k 'b'
++*.ico -k 'b'
++*.ICO -k 'b'
+Index: log_accum.pl
+===================================================================
+RCS file: /home/repos-user/jiangxin/homepage/worldhello/docbook/cvs_vs_starteam/CVSROOT/log_accum.pl,v
+retrieving revision 1.1
+retrieving revision 1.2
+diff -u -r1.1 -r1.2
+--- log_accum.pl	14 Aug 2003 10:00:53 -0000	1.1
++++ log_accum.pl	15 Aug 2003 02:00:35 -0000	1.2
+@@ -47,6 +47,7 @@
+ my $LOG_FILE      = "$BASE_FN.log";
+ my $SUMMARY_FILE  = "$BASE_FN.summary";
+ my $LOGNAMES_FILE = "$BASE_FN.lognames";
++my $MAILNAMES_FILE = "$BASE_FN.mailnames";
+ my $SUBJ_FILE     = "$BASE_FN.subj";
+ my $TAGS_FILE     = "$BASE_FN.tags";
+ my $DIFF_FILE     = "$BASE_FN.diff";
+@@ -233,7 +234,8 @@
+ 	while (<RCS>) {
+ 		if (/^[ \t]*Repository revision/) {
+ 			chomp;
+-			my @revline = split;
++			my @revline = split(/[ \t]+/, $_, 5);
++			shift @revline while($revline[0] eq "");
+ 			$revision = $revline[2];
+ 			$revline[3] =~ m|^$CVSROOT/+(.*),v$|;
+ 			$rcsfile = $1;
+@@ -383,20 +385,6 @@
+ # !!! Mailing-list and commitlog history file mappings here !!!
+ # This needs pulling out as a configuration block somewhere so
+ # that others can easily change it.
+-sub get_log_name {
+-	my $dir = shift;	# Directory name
+-
+-
+-	for my $i (0 .. ($#cfg::LOG_FILE_MAP - 1) / 2) {
+-		my $log = $cfg::LOG_FILE_MAP[$i * 2];
+-		my $pattern = $cfg::LOG_FILE_MAP[$i * 2 + 1];
+-
+-		return $log if $dir =~ /$pattern/;
+-	}
+-
+-	return 'other';
+-}
+-
+ 
+ sub do_changes_file {
+ 	my @text = @_;
+@@ -408,11 +396,17 @@
+ 		$unique{$category} = 1;
+ 
+ 		my $changes = "$CVSROOT/CVSROOT/commitlogs/$category";
+-		open CHANGES, ">>$changes"
+-			or die "Cannot open $changes.\n";
+-		print CHANGES map { "$_\n" } @text;
+-		print CHANGES "\n\n\n";
+-		close CHANGES;
++		if (open CHANGES, ">>$changes")
++		{
++			print CHANGES map { "$_\n" } @text;
++			print CHANGES "\n\n\n";
++			close CHANGES;
++		}
++		else
++		{
++			print "Cannot open $changes.\n";
++		}
++
+ 	}
+ }
+ 
+@@ -420,22 +414,29 @@
+ sub mail_notification {
+ 	my @text = @_;
+ 
+-# This is turned off since the To: lines go overboard.
+-# Also it has bit-rotted since, and can't just be switched on again.
+-# - but keep it for the time being in case we do something like cvs-stable
+-#	my @mailaddrs = &read_logfile($LOGNAMES_FILE);
+-#	print(MAIL 'To: cvs-committers' . $dom . ", cvs-all" . $dom);
+-#	foreach $line (@mailaddrs) {
+-#		next if ($unique{$line});
+-#		$unique{$line} = 1;
+-#		next if /^cvs-/;
+-#		print(MAIL ", " . $line . $dom);
+-#	}
+-#	print(MAIL "\n");
++	if (! &cfg::sendmail_acl_check())
++	{
++		print "mail sent from $cfg::COMMITTER is blocked.\n";
++		return 0;	
++	}
++
++	my %unique = ();
++	my @mailaddrs = &read_logfile($MAILNAMES_FILE);
++	# ok, this is kinda hokey, but I need to break up lines with multiple addresses
++	my $fu = join(" ", @mailaddrs);
++	@mailaddrs = split " ", $fu;
++
++	my $to = "";
++	foreach my $category (@mailaddrs) {
++		next if ($unique{$category});
++		$unique{$category} = 1;
++
++		$to .= " " unless $to eq "";
++		$to .= $category;
++	}
+ 
+ 	my @email = ();
+ 
+-	my $to = $cfg::MAILADDRS;
+ 	print "Mailing the commit message to '$to'.\n";
+ 
+ 	push @email, "To: $to" if $cfg::ADD_TO_LINE;
+@@ -497,10 +498,14 @@
+ 	}
+ 
+ 	# Send the email.
+-	open MAIL, "| $cfg::MAILCMD $to"
+-	    or die "Please check $cfg::MAILCMD.";
+-	print MAIL map { "$_\n" } @email;
+-	close MAIL;
++	if(fork() == 0)
++	{
++		open MAIL, "| $cfg::MAILCMD -F $cfg::COMMITTER $to"
++	    		or die "Please check $cfg::MAILCMD.";
++		print MAIL map { "$_\n" } @email;
++		close MAIL;
++	}
++	exit(0);
+ }
+ 
+ 
+@@ -634,8 +639,9 @@
+ #
+ # Initialize basic variables
+ #
++my $separator=",,,";
+ my $input_params = $ARGV[0];
+-my ($directory, @filenames) = split " ", $input_params;
++my ($directory, @filenames) = split / ${separator}/, $input_params;
+ #@files = split(' ', $input_params);
+ 
+ my @path = split('/', $directory);
+@@ -660,8 +666,9 @@
+ }
+ 
+ # Was used for To: lines, still used for commitlogs naming.
+-&append_line($LOGNAMES_FILE, &get_log_name("$directory/"));
+-&append_line($SUBJ_FILE, "$directory " . join(" ", sort @filenames));
++&append_line($LOGNAMES_FILE, &cfg::get_log_name("$directory/"));
++&append_line($MAILNAMES_FILE, &cfg::get_mail_name("$directory/"));
++&append_line($SUBJ_FILE, "$directory/(" . join(",", sort @filenames) .") ");
+ 
+ #
+ # Check for a new directory first.  This will always appear as a
+@@ -697,7 +704,7 @@
+ 
+ 	&do_changes_file(@text);
+ 	&mail_notification(@text);
+-	system("/usr/local/bin/awake", $directory);
++	# system("/usr/local/bin/awake", $directory);
+ 	&cleanup_tmpfiles();
+ 	exit 0;
+ }
+@@ -742,7 +749,28 @@
+ 	}
+ 
+ 	# otherwise collect information about which files changed.
+-	my @files = split;
++	my @tmpfiles = split;
++	my $strname = "";
++	my @files;
++	while (my $item = shift(@tmpfiles))
++	{
++		if ($strname eq "") 
++		{
++			$strname = $item;
++		} 
++		else	
++		{
++			$strname .= " $item";
++		} 
++		for (my $i=0; $i<=$#filenames; $i++)
++		{
++			if ($strname eq $filenames[$i])
++			{
++				push (@files, $strname);
++				$strname = "";
++			}
++		}
++	}
+ 	push @{ $changed_files{$tag} },	@files if $state == $STATE_CHANGED;
+ 	push @{ $added_files{$tag} },	@files if $state == $STATE_ADDED;
+ 	push @{ $removed_files{$tag} },	@files if $state == $STATE_REMOVED;
+@@ -896,7 +924,7 @@
+ 	&mail_notification(@log_msg);
+ }
+ 
+-system("/usr/local/bin/awake", $directory);
++# system("/usr/local/bin/awake", $directory);
+ &cleanup_tmpfiles();
+ exit 0;
+ # EOF
+Index: logcheck
+===================================================================
+RCS file: /home/repos-user/jiangxin/homepage/worldhello/docbook/cvs_vs_starteam/CVSROOT/logcheck,v
+retrieving revision 1.1
+retrieving revision 1.2
+diff -u -r1.1 -r1.2
+--- logcheck	14 Aug 2003 10:00:53 -0000	1.1
++++ logcheck	15 Aug 2003 02:01:37 -0000	1.2
+@@ -47,8 +47,10 @@
+ 
+ # Remove leading and trailing blank lines.  (There will be at most
+ # one because of the duplicate removal above).
++local $^W = 0;
+ shift @log_in if $log_in[0] eq "";
+ pop @log_in if $log_in[-1] eq "";
++local $^W = 1;
+ 
+ # Scan through the commit message looking for templated headers
+ # as defined in the configuration file, and rcstemplate.
+@@ -104,6 +106,9 @@
+ # completely empty.  This is a bug in cvs.
+ my $log = "@log_in";
+ die "Log message contains no content!\n" if $log =~ /^\s*$/;
++
++# commit without commit log using WINCVS , will automatically provide commit log as "no message".
++die "Log message contains no content using WINCVS!\n" if $log =~ /^no message$/ or $log =~ /^\.+$/;
+ 
+ 
+ # Write the modified log file back out.
+Index: loginfo
+===================================================================
+RCS file: /home/repos-user/jiangxin/homepage/worldhello/docbook/cvs_vs_starteam/CVSROOT/loginfo,v
+retrieving revision 1.1
+retrieving revision 1.2
+diff -u -r1.1 -r1.2
+--- loginfo	14 Aug 2003 10:00:53 -0000	1.1
++++ loginfo	15 Aug 2003 02:05:26 -0000	1.2
+@@ -27,4 +27,6 @@
+ #DEFAULT (echo ""; id; echo %s; date; cat) >> $CVSROOT/CVSROOT/commitlog
+ # or
+ #DEFAULT (echo ""; id; echo %{sVv}; date; cat) >> $CVSROOT/CVSROOT/commitlog
+-DEFAULT		$CVSROOT/CVSROOT/log_accum.pl %s
++
++# Donot change the delimiter before each filenames. Lookup script: log_accum.pl;
++DEFAULT		$CVSROOT/CVSROOT/log_accum.pl %{,,,s}
+Index: rcsinfo
+===================================================================
+RCS file: /home/repos-user/jiangxin/homepage/worldhello/docbook/cvs_vs_starteam/CVSROOT/rcsinfo,v
+retrieving revision 1.1
+retrieving revision 1.2
+diff -u -r1.1 -r1.2
+--- rcsinfo	14 Aug 2003 10:00:53 -0000	1.1
++++ rcsinfo	15 Aug 2003 02:41:57 -0000	1.2
+@@ -15,4 +15,4 @@
+ # If the name "ALL" appears as a regular expression it is always used
+ # in addition to the first matching regex or "DEFAULT".
+ #
+-ALL			$CVSROOT/CVSROOT/rcstemplate
++#ALL			$CVSROOT/CVSROOT/rcstemplate
+Index: tagcheck
+===================================================================
+RCS file: /home/repos-user/jiangxin/homepage/worldhello/docbook/cvs_vs_starteam/CVSROOT/tagcheck,v
+retrieving revision 1.1
+retrieving revision 1.2
+diff -u -r1.1 -r1.2
+--- tagcheck	14 Aug 2003 10:00:53 -0000	1.1
++++ tagcheck	15 Aug 2003 02:06:41 -0000	1.2
+@@ -1,31 +1,144 @@
+-#! /bin/sh
++#!/usr/bin/perl -w
+ #
+-# $FreeBSD: CVSROOT-src/tagcheck,v 1.10 2003/01/10 03:05:43 kris Exp $
++# $Id: tagcheck,v 1.2 2003/08/15 02:06:41 jiangxin Exp $
++# Author: Jiang Xin
++# Reference: http://www.worldhello.net/
++#
++
++use strict;
++use lib $ENV{CVSROOT};
++use CVSROOT::cfg;
+ 
++
++#############################################################
++#
++# Main Body
++#
+ # TAG  add/mov/del  repo  files...
+ # $1   $2           $3    $4   ...
++#
++############################################################
++
++my $tag = shift;
++my $action = shift;
++my $repos = shift;
++my $fileitem = "";
++my $filerev= "";
++my $filelist = "";
++
++my $uid = $cfg::COMMITTER;
++my $userlist = "";
++my $pattern = "";
++my $permission = 1;
++my $to = "";
++
++my $tmpstr = &cfg::get_mail_name($repos);
++$tmpstr =~ s/\@/\./g ;
++$tmpstr="nobody" unless $tmpstr;
++my $MAILFILE = "/var/spool/cvsmail/cvs.tag.$tmpstr.$cfg::PID";
++
++die "Usage: tagcheck tag action repos files...\n" unless $repos;
++
++for my $i (0 .. ($#cfg::TAG_MAP - 1) / 2) {
++	$userlist = $cfg::TAG_MAP[$i * 2];
++	$pattern = $cfg::TAG_MAP[$i * 2 + 1];
++	
++	if ($tag =~ /$pattern/i)
++	{
++		if ($userlist =~ /\b$uid\b/i)
++		{
++			$permission=1;
++			last;
++		}
++		else
++		{
++			$permission=0;
++			last;
++		}
++	}
++}
++
++if ($permission == 0)
++{
++	# normal users can not do this.
++	print STDERR "User \"$cfg::COMMITTER\" canot perform this operation!\n";
++	print STDERR "Only users: $userlist, can handle tag patterm: \"$pattern\"!\n";
++}
++
++if (! &cfg::sendmail_acl_check())
++{
++	print "mail sent from $cfg::COMMITTER is blocked.\n";
++}
++else
++{
++	while ($fileitem = shift)
++	{
++	        $filerev = shift;
++	        $filelist = sprintf("%s\t%-24s:\t%s\n", $filelist, $fileitem, $filerev);
++	}
++	print "save message in spool `dirname $MAILFILE`...\n";
++	
++	my @email = ();
++	
++	if (! -e $MAILFILE )
++	{
++		$to = &cfg::get_mail_name($repos);
++		push @email, "From: $uid<$uid>";
++		push @email, "To: $to";
++		$tmpstr = sprintf("Date: %s", `date -R`);
++		chomp $tmpstr;
++		push @email, $tmpstr;
++	
++		if ($permission == 0)
++		{
++			push @email, "Subject: cvs tag FAILED! ($action $tag on $repos)";
++		}
++		else
++		{
++			push @email, "Subject: cvs tag success: $action $tag on $repos";
++		}
++	
++		push @email, "";
++	
++		delete $ENV{'TZ'};
++		$tmpstr = sprintf("%-11s:    %-8s", "Author", $cfg::COMMITTER);
++		push @email, $tmpstr;
++		$tmpstr = sprintf("%-11s:    %-8s", "Date", `/bin/date +"%Y/%m/%d %H:%M:%S %Z"`);
++		chomp $tmpstr;
++		push @email, $tmpstr;
++		$tmpstr = sprintf("%-11s:    %-8s", "Tag", $tag);
++		push @email, $tmpstr;
++		$tmpstr = sprintf("%-11s:    %-8s", "Operation", $action);
++		push @email, $tmpstr;
++	
++		push @email, "";
++		push @email, "  $cfg::MAILBANNER", "" if $cfg::MAILBANNER;
++	}
++	
++	if ($permission == 0)
++	{
++		push @email, "Permission denied: $action $tag on $repos !";
++		push @email, "--------------------------------------------------";
++	}
++	else
++	{
++		$tmpstr = sprintf("%-11s:    %-8s", "Repository", $repos);
++		push @email, $tmpstr;
++		push @email, $filelist if $filelist;
++	}
++	
++	#save mail to spool
++	open MAIL, ">> $MAILFILE "
++		or die "Cannot open file $MAILFILE for append.";
++	print MAIL map { "$_\n" } @email;
++	close MAIL;
++}
+ 
+-case "$1" in
+-  RELENG*)
+-    ;;
+-  RELEASE*)
+-    ;;
+-  *)
+-    exit 0	# not reserved, ok.
+-    ;;
+-esac
+-
+-USER=`/usr/bin/id -un`
+-case "$USER" in
+-  peter | jdp | markm | obrien | murray | jhb | bmah | scottl | kris | nik)
+-    exit 0	# ok
+-    ;;
+-  *)
+-    echo "$USER does not have permission to perform this tag operation!" 1>&2
+-    echo "RELENG* tag operations are reserved for release engineering!" 1>&2
+-    echo "RELEASE* tag operations are reserved for portmgr and doceng!" 1>&2
+-    echo "Use 'cvs add' or 'cvs rm' to add/remove files from branches!" 1>&2
+-    echo "$*" | /usr/bin/mail -s "NCVS TAG" cvs
+-    exit 1
+-    ;;
+-esac
++if ($permission == 0)
++{
++	exit 1
++}
++else
++{
++	exit 0
++}
+Index: freebsd/mailsend.c
+===================================================================
+RCS file: /home/repos-user/jiangxin/homepage/worldhello/docbook/cvs_vs_starteam/CVSROOT/freebsd/mailsend.c,v
+retrieving revision 1.1
+retrieving revision 1.2
+diff -u -r1.1 -r1.2
+--- freebsd/mailsend.c	14 Feb 2003 05:33:39 -0000	1.1
++++ freebsd/mailsend.c	10 Apr 2003 06:11:45 -0000	1.2
+@@ -112,6 +112,7 @@
+ 	char	*cc = NULL;
+ 	char	*bcc = NULL;
+ 	char	*delmode = NULL;
++	char	*otherflags = NULL;
+ 	char	*verbose = NULL;
+ 	char	*hostname = NULL;
+ 	int	headers = 0;
+@@ -199,8 +200,16 @@
+ 	ac -= optind;
+ 	av += optind;
+ 	if (ac < 1) {
+-		writestr(2, "you must supply an address!\n");
+-		usage();
++		if (!headers)
++		{
++			writestr(2, "you must supply an address, or use -H option!\n");
++			usage();
++		}
++		else
++		{
++			writestr(1, "get recipients from <stdin>\n");
++			otherflags = "-t";
++		}
+ 	}
+ 
+ 	if (hostname == NULL) {
+@@ -250,6 +259,10 @@
+ 
+ 	if (verbose) {
+ 		*vec++ = verbose;
++	}
++
++	if (otherflags) {
++		*vec++ = otherflags;
+ 	}
+ 
+ 	if (from) {

@@ -1,0 +1,35 @@
+#
+# $FreeBSD: CVSROOT-src/access.unclassified,v 1.641 2003/06/01 00:26:52 marcus Exp $
+#
+# This is a list of people who have unclassified commit bits who failed
+# to select their new home on the other access lists.
+# Any active committer may move folks from here to the correct lists
+# if requested.
+#
+asami
+sef
+torstenb
+dima
+chuckr
+yokota
+danny
+jmb
+semenu
+dburr
+abial
+sada
+dirk
+dbaker
+andy
+nakai
+groudier
+reg
+unfurl
+dec
+assar
+shafeeq		devnull
+cokane
+keith
+logo
+rpratt
+amorita

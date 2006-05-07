@@ -1,0 +1,215 @@
+#
+# $FreeBSD: CVSROOT-src/access,v 1.611 2003/08/06 22:25:39 jake Exp $
+#
+# Please try to keep the handbook (contrib/chapter.sgml authors.ent
+# staff/chapter.sgml) in in sync with this.
+#
+#
+#	KEEP ALPHABETICALLY SORTED!!!
+#	KEEP ALPHABETICALLY SORTED!!!
+#	KEEP ALPHABETICALLY SORTED!!!
+#
+# When adding a new committer to this file, please make sure to
+# include the following information in the commit message:
+#   (1) Who the commit bit was approved by ("Approved by: core").
+#   (2) The full name of the person.
+#   (3) In brief, what they will be working on (a couple of sentences).
+#
+ache
+adrian
+akiyama
+alc
+alfred
+am
+ambrisko
+andreas
+anholt
+archie
+arr
+arun
+babkin
+bbraun
+bde
+ben
+benno
+billf
+bmah
+bmilekic
+bms
+bp
+brian		freebsd-committers@Awfulhak.org
+brooks
+bsd
+cg		devcon@ijcg.net
+charnier
+chm
+chris
+cjc
+cognet
+cracauer
+cwt
+dan
+darrenr
+das
+davidc
+davidxu
+dcs
+dd
+dds
+deischen
+des
+dfr
+dg
+dmlb
+dougb
+dwhite
+dwmalone	dwmalone=freebsd-committers@maths.tcd.ie
+eivind
+emoore
+eric
+fanf
+fenner
+fjoe
+gad
+gallatin
+ghelmer
+gibbs
+gioria
+gj
+gordon
+green
+grehan
+greid
+grog
+gshapiro	gshapiro+freebsd-cvs-committers@gshapiro.net
+guido
+harti
+hm
+hoek
+hosokawa
+hrs
+hsu
+iedowse
+ikob
+imp
+iwasaki
+jake
+jayanth
+jb
+jdp		freebsd-committers-in@polstra.com
+jedgar
+jeff
+jennifer
+jesper
+jhay
+jhb
+jim
+jkh
+jkoshy
+jlemon
+jmallett
+jmg
+jmz
+joe
+joerg	freebsd-org@uriah.heep.sax.de
+johan
+jon
+julian
+jwd
+kan
+kato
+kbyanc
+keichii
+ken
+kjc
+knu
+kris
+kuriyama
+lars
+luigi
+luoqi
+marcel
+markm
+matusita
+max
+maxim
+mbr
+mckay
+mckusick
+mdodd
+mike
+mikeh
+mini
+mjacob
+motoyuki
+mp
+mph
+mpp
+mr
+msmith	devnull
+mtm
+murray
+mux
+n_hibma	devnull
+nate
+nectar	nectar/freebsd-src@celabo.org
+nik
+njl
+non
+nsayer
+nsouch
+nyan
+obrien
+onoe
+orion
+paul
+pb
+pdeuskar
+peter
+phantom
+phk
+ps
+robert
+roberto
+roger
+rse
+ru
+rwatson bb+lists.freebsd.cvs-committers@cyrus.watson.org
+sam
+sanpei
+schweikh
+scottl
+se
+sheldonh
+shiba
+silby
+simokawa
+smace
+smkelly
+sobomax
+sos
+stephane
+steve
+sumikawa
+suz
+takawata
+tanimura
+tegge
+tg
+thomas
+ticso
+tjr
+tmm
+tobez
+tomsoft
+trhodes
+truckman
+uhclem
+ume
+wes
+wilko
+will
+wollman
+wosch	bsd@panke.de.freebsd.org
+wpaul
+yar

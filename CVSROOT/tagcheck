@@ -1,0 +1,144 @@
+#!/usr/bin/perl -w
+#
+# $Id: tagcheck,v 1.2 2003/08/15 02:06:41 jiangxin Exp $
+# Author: Jiang Xin
+# Reference: http://www.worldhello.net/
+#
+
+use strict;
+use lib $ENV{CVSROOT};
+use CVSROOT::cfg;
+
+
+#############################################################
+#
+# Main Body
+#
+# TAG  add/mov/del  repo  files...
+# $1   $2           $3    $4   ...
+#
+############################################################
+
+my $tag = shift;
+my $action = shift;
+my $repos = shift;
+my $fileitem = "";
+my $filerev= "";
+my $filelist = "";
+
+my $uid = $cfg::COMMITTER;
+my $userlist = "";
+my $pattern = "";
+my $permission = 1;
+my $to = "";
+
+my $tmpstr = &cfg::get_mail_name($repos);
+$tmpstr =~ s/\@/\./g ;
+$tmpstr="nobody" unless $tmpstr;
+my $MAILFILE = "/var/spool/cvsmail/cvs.tag.$tmpstr.$cfg::PID";
+
+die "Usage: tagcheck tag action repos files...\n" unless $repos;
+
+for my $i (0 .. ($#cfg::TAG_MAP - 1) / 2) {
+	$userlist = $cfg::TAG_MAP[$i * 2];
+	$pattern = $cfg::TAG_MAP[$i * 2 + 1];
+	
+	if ($tag =~ /$pattern/i)
+	{
+		if ($userlist =~ /\b$uid\b/i)
+		{
+			$permission=1;
+			last;
+		}
+		else
+		{
+			$permission=0;
+			last;
+		}
+	}
+}
+
+if ($permission == 0)
+{
+	# normal users can not do this.
+	print STDERR "User \"$cfg::COMMITTER\" canot perform this operation!\n";
+	print STDERR "Only users: $userlist, can handle tag patterm: \"$pattern\"!\n";
+}
+
+if (! &cfg::sendmail_acl_check())
+{
+	print "mail sent from $cfg::COMMITTER is blocked.\n";
+}
+else
+{
+	while ($fileitem = shift)
+	{
+	        $filerev = shift;
+	        $filelist = sprintf("%s\t%-24s:\t%s\n", $filelist, $fileitem, $filerev);
+	}
+	print "save message in spool `dirname $MAILFILE`...\n";
+	
+	my @email = ();
+	
+	if (! -e $MAILFILE )
+	{
+		$to = &cfg::get_mail_name($repos);
+		push @email, "From: $uid<$uid>";
+		push @email, "To: $to";
+		$tmpstr = sprintf("Date: %s", `date -R`);
+		chomp $tmpstr;
+		push @email, $tmpstr;
+	
+		if ($permission == 0)
+		{
+			push @email, "Subject: cvs tag FAILED! ($action $tag on $repos)";
+		}
+		else
+		{
+			push @email, "Subject: cvs tag success: $action $tag on $repos";
+		}
+	
+		push @email, "";
+	
+		delete $ENV{'TZ'};
+		$tmpstr = sprintf("%-11s:    %-8s", "Author", $cfg::COMMITTER);
+		push @email, $tmpstr;
+		$tmpstr = sprintf("%-11s:    %-8s", "Date", `/bin/date +"%Y/%m/%d %H:%M:%S %Z"`);
+		chomp $tmpstr;
+		push @email, $tmpstr;
+		$tmpstr = sprintf("%-11s:    %-8s", "Tag", $tag);
+		push @email, $tmpstr;
+		$tmpstr = sprintf("%-11s:    %-8s", "Operation", $action);
+		push @email, $tmpstr;
+	
+		push @email, "";
+		push @email, "  $cfg::MAILBANNER", "" if $cfg::MAILBANNER;
+	}
+	
+	if ($permission == 0)
+	{
+		push @email, "Permission denied: $action $tag on $repos !";
+		push @email, "--------------------------------------------------";
+	}
+	else
+	{
+		$tmpstr = sprintf("%-11s:    %-8s", "Repository", $repos);
+		push @email, $tmpstr;
+		push @email, $filelist if $filelist;
+	}
+	
+	#save mail to spool
+	open MAIL, ">> $MAILFILE "
+		or die "Cannot open file $MAILFILE for append.";
+	print MAIL map { "$_\n" } @email;
+	close MAIL;
+}
+
+if ($permission == 0)
+{
+	exit 1
+}
+else
+{
+	exit 0
+}

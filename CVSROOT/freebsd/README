@@ -1,0 +1,6 @@
+$FreeBSD: CVSROOT/freebsd/README,v 1.1 2001/11/15 14:19:21 joe Exp $
+
+This directory contains scripts and tools that we use in the FreeBSD
+project, but which aren't necessarily fit for general consumption.
+
+(end)

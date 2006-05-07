@@ -1,0 +1,8 @@
+# $FreeBSD: CVSROOT-src/access.master,v 1.1 2003/03/01 20:24:39 peter Exp $
+#
+# repo-meister fallback access list.  This is only for emergencies should
+# something get broken or corrupted in the other lists.
+#
+joe
+markm
+peter
