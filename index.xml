@@ -29,9 +29,9 @@
 
 <revhistory>
 <!--revision>
-<revnumber>$Revision: 1.60 $</revnumber>
-<date>$Date: 2005/02/24 09:20:52 $</date>
-<authorinitials>$Author: jiangxin $</authorinitials>
+<revnumber>$Revision$</revnumber>
+<date>$Date$</date>
+<authorinitials>$Author$</authorinitials>
 <revremark>...</revremark>
 </revision-->
 
@@ -4653,7 +4653,7 @@ STCFGP="release"
 st 的参数及使用方法
 </para>
 <screen>
-StarTeam command line emulator, $Revision: 1.60 $, by YZW,JX
+StarTeam command line emulator, $Revision$, by YZW,JX
 
 Usage: st [st_options] [st_command] [command_options] [command_args]
     st      
